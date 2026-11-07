@@ -22,7 +22,7 @@ if (-not (Test-Path (Join-Path $IsaacLabDir "pyproject.toml"))) {
     exit 1
 }
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-    Write-Host "ERROR: 'uv' is not on your PATH. It comes with the Isaac Lab setup; install it from https://docs.astral.sh/uv/"
+    Write-Host "ERROR: 'uv' is not installed on your machine. Install it from https://docs.astral.sh/uv/ or run pip install uv."
     exit 1
 }
 

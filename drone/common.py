@@ -1,8 +1,10 @@
-"""Shared helpers for the drone scripts.
+"""Shared helpers for the drone scripts. This is the only file that talks to Isaac Sim.
 
-Pattern copied from IsaacLab/examples/arl_robot_1.py: one ARL Robot 1 quadrotor, flown
-by the Lee position controller (a classical, non-learned controller), stepped by hand
-with no RL environment.
+Pattern copied from IsaacLab/examples/arl_robot_1.py: one ARL Robot 1 quadrotor stepped
+by hand with no RL environment, flown by a classical (non-learned) controller: our PID
+(controllers/pid.py, default) or Isaac Lab's Lee position controller (--controller lee).
+Optional thrust-loss fault from faults/thrust_loss.py (--fault). The
+simulator-independent parts (controllers/, faults/, analysis/) never import Isaac.
 
 IMPORTANT: Isaac Sim must be launched before most isaaclab modules can be imported, so
 every import other than argparse/isaaclab.app happens inside a function.
@@ -10,6 +12,7 @@ every import other than argparse/isaaclab.app happens inside a function.
 
 import argparse
 import copy
+from types import SimpleNamespace
 
 from isaaclab.app import add_launcher_args
 
@@ -23,7 +26,15 @@ STATE_COLUMNS = (
     + [f"lin_vel_{a}" for a in "xyz"]  # world-frame linear velocity [m/s]
     + [f"ang_vel_{a}" for a in "xyz"]  # body-frame angular velocity [rad/s]
     + [f"setpoint_{a}" for a in "xyz"]  # where the controller was told to go
-    + [f"thrust_cmd_{i}" for i in range(4)]  # commanded thrust per propeller
+    # thrust the controller asked for, per propeller [N]
+    + [f"thrust_cmd_{i}" for i in range(4)]
+    # thrust actually sent after the fault [N]
+    + [f"thrust_applied_{i}" for i in range(4)]
+    # 0/1, motor index (-1 = none), lost fraction
+    + ["fault_active", "fault_motor", "fault_loss"]
+    # IMU proper acceleration, body frame (+9.81 on z at rest) [m/s^2]
+    + [f"imu_lin_acc_{a}" for a in "xyz"]
+    + [f"imu_ang_vel_{a}" for a in "xyz"]  # IMU angular velocity, body frame [rad/s]
 )
 
 
@@ -61,6 +72,41 @@ def build_parser(description: str) -> argparse.ArgumentParser:
         help="Hard stop after this many steps (-1: no limit).",
     )
     parser.add_argument(
+        "--controller",
+        default="pid",
+        choices=["pid", "lee"],
+        help="pid = our PID (default); "
+        "lee = Isaac Lab's Lee controller (regression check).",
+    )
+    parser.add_argument(
+        "--fault",
+        default="none",
+        choices=["none", "random", "fixed"],
+        help="none; random = seeded random thrust loss; "
+        "fixed = use --fault_motor/_loss/_onset.",
+    )
+    parser.add_argument(
+        "--fault_seed",
+        type=int,
+        default=0,
+        help="Seed for --fault random (same seed = same fault).",
+    )
+    parser.add_argument(
+        "--fault_motor", type=int, default=0, help="Motor index 0-3 for --fault fixed."
+    )
+    parser.add_argument(
+        "--fault_loss",
+        type=float,
+        default=0.25,
+        help="Lost thrust fraction for --fault fixed.",
+    )
+    parser.add_argument(
+        "--fault_onset",
+        type=float,
+        default=4.0,
+        help="Fault start time [s] for --fault fixed.",
+    )
+    parser.add_argument(
         "--physics",
         default="isaacsim_physx",
         choices=["isaacsim_physx"],
@@ -85,13 +131,52 @@ def parse_args(
     return args
 
 
+def travel_time(args) -> float:
+    """Seconds the target point needs to go from A to B at --speed."""
+    import numpy as np
+
+    return (
+        float(np.linalg.norm(np.asarray(args.goal) - np.asarray(args.start)))
+        / args.speed
+    )
+
+
+def flight_duration(args, fault=None) -> float:
+    """Seconds of the whole run.
+
+    Travel A->B, hover for --hold, and with a fault at least 10 s after it starts.
+    """
+    from faults.thrust_loss import run_duration
+
+    return run_duration(travel_time(args) + args.hold, fault)
+
+
+def make_fault(args):
+    """The fault for this run (a FaultSpec), or None for --fault none."""
+    from faults.thrust_loss import FaultSpec, sample_fault
+
+    if args.fault == "random":
+        # onset while travelling; --hold does not matter
+        return sample_fault(args.fault_seed, travel_time(args))
+    if args.fault == "fixed":
+        return FaultSpec(
+            motor=args.fault_motor, loss=args.fault_loss, onset_t=args.fault_onset
+        )
+    return None
+
+
 def make_world(args, physics_cfg):
-    """Create sim, ground, light, robot at A and the Lee controller.
+    """Create sim, ground, light, robot at point A, IMU, controller and fault.
 
     Call inside launch_simulation().
+
+    Returns a namespace with: sim, robot, imu, controller (the one flying), lee (always
+    built: it also provides the drone's mass and inertia), alloc_pinv, fault.
     """
     import isaaclab.sim as sim_utils
     import torch
+    from controllers.pid import CascadedPID
+    from isaaclab.sensors import ImuCfg
     from isaaclab.utils import instantiate, replace
     from isaaclab_assets.robots.arl_robot_1 import ARL_ROBOT_1_CFG
     from isaaclab_contrib.controllers.lee_position_control import LeePosController
@@ -117,10 +202,13 @@ def make_world(args, physics_cfg):
     robot_cfg.init_state.pos = tuple(args.start)  # spawn at A
     robot_cfg.actuators["thrusters"].dt = sim_cfg.dt
     robot = instantiate(robot_cfg)
+    # IMU on the drone's main body. Must be created before sim.reset() so it initializes
+    # with the robot.
+    imu = instantiate(ImuCfg(prim_path="/World/Robot/base_link"))
 
     sim.reset()
 
-    controller = LeePosController(
+    lee = LeePosController(
         LeePosControllerCfg(
             K_pos_range=((2.5, 2.5, 1.5), (3.5, 3.5, 2.0)),
             K_vel_range=((2.5, 2.5, 1.5), (3.5, 3.5, 2.0)),
@@ -133,22 +221,44 @@ def make_world(args, physics_cfg):
         num_envs=1,
         device=str(sim.device),
     )
-    # The controller outputs a 6-D wrench [Fx,Fy,Fz,Tx,Ty,Tz]; the robot takes 4
+    if args.controller == "pid":
+        controller = CascadedPID(
+            num_envs=1,
+            mass=float(lee.mass.flatten()[0]),
+            inertia=lee.robot_inertia,
+            dt=SIM_DT,
+            device=str(sim.device),
+        )
+    else:
+        controller = lee
+    # Both controllers output a 6-D wrench [Fx,Fy,Fz,Tx,Ty,Tz]; the robot takes 4
     # propeller thrusts. The allocation matrix maps thrusts -> wrench, so its
     # pseudoinverse maps wrench -> thrusts.
     alloc = torch.tensor(
         robot_cfg.allocation_matrix, device=sim.device, dtype=torch.float32
     )
     alloc_pinv = torch.linalg.pinv(alloc)  # (4, 6)
-    return sim, robot, controller, alloc_pinv
+    return SimpleNamespace(
+        sim=sim,
+        robot=robot,
+        imu=imu,
+        controller=controller,
+        lee=lee,
+        alloc_pinv=alloc_pinv,
+        fault=make_fault(args),
+    )
 
 
 def _t(x):
-    """Warp array or torch tensor -> torch tensor."""
+    """Warp array, Isaac ProxyArray or torch tensor -> torch tensor."""
     import torch
     import warp as wp
 
-    return x if torch.is_tensor(x) else wp.to_torch(x)
+    if torch.is_tensor(x):
+        return x
+    if hasattr(x, "torch"):  # ProxyArray (e.g. sensor data) has a zero-copy .torch view
+        return x.torch
+    return wp.to_torch(x)
 
 
 def setpoint_at(t: float, start, goal, speed: float):
@@ -159,6 +269,17 @@ def setpoint_at(t: float, start, goal, speed: float):
     dist = float(np.linalg.norm(goal - start))
     frac = 1.0 if dist == 0.0 else min(t * speed / dist, 1.0)
     return start + frac * (goal - start)
+
+
+def setpoint_vel_at(t: float, start, goal, speed: float):
+    """Velocity of the 'carrot': `speed` along A->B while travelling, then zero at B."""
+    import numpy as np
+
+    start, goal = np.asarray(start, dtype=float), np.asarray(goal, dtype=float)
+    dist = float(np.linalg.norm(goal - start))
+    if dist == 0.0 or t * speed >= dist:
+        return np.zeros(3)
+    return speed * (goal - start) / dist
 
 
 class PathDrawer:
@@ -201,16 +322,23 @@ class PathDrawer:
             )
 
 
-def fly_a_to_b(args, sim, robot, controller, alloc_pinv):
+def fly_a_to_b(args, world):
     """Step the sim along the straight line A->B, then hover.
 
     Yields one dict per step (keys = STATE_COLUMNS).
     """
-    import numpy as np
     import torch
+    from faults.thrust_loss import apply as apply_fault
+    from faults.thrust_loss import is_active
 
-    dist = float(np.linalg.norm(np.asarray(args.goal) - np.asarray(args.start)))
-    total_steps = int((dist / args.speed + args.hold) / SIM_DT)
+    sim, robot, imu, controller, fault = (
+        world.sim,
+        world.robot,
+        world.imu,
+        world.controller,
+        world.fault,
+    )
+    total_steps = int(flight_duration(args, fault) / SIM_DT)
     if args.max_steps > 0:
         total_steps = min(total_steps, args.max_steps)
 
@@ -222,22 +350,42 @@ def fly_a_to_b(args, sim, robot, controller, alloc_pinv):
             return
         t = step * SIM_DT
         sp = setpoint_at(t, args.start, args.goal, args.speed)
-        command = torch.zeros((1, 4), device=sim.device)  # [x, y, z, yaw]
-        command[0, :3] = torch.tensor(sp, device=sim.device)
+        state = {
+            "pos": _t(robot.data.root_pos_w),
+            "quat": _t(robot.data.root_quat_w),
+            "lin_vel": _t(robot.data.root_lin_vel_w),
+            "ang_vel": _t(robot.data.root_ang_vel_b),
+        }
 
-        wrench = controller.compute(command)
+        if args.controller == "pid":
+            dev = sim.device
+            sp_pos = torch.tensor(sp, device=dev, dtype=torch.float32).unsqueeze(0)
+            sp_vel = torch.tensor(
+                setpoint_vel_at(t, args.start, args.goal, args.speed),
+                device=dev,
+                dtype=torch.float32,
+            ).unsqueeze(0)
+            wrench = controller.compute(
+                state["pos"],
+                state["lin_vel"],
+                state["quat"],
+                state["ang_vel"],
+                sp_pos,
+                sp_vel,
+            )
+        else:  # Lee reads the robot state itself and takes [x, y, z, yaw]
+            command = torch.zeros((1, 4), device=sim.device)
+            command[0, :3] = torch.tensor(sp, device=sim.device)
+            wrench = controller.compute(command)
         # propellers can't pull down
-        thrust_cmd = (wrench @ alloc_pinv.T).clamp(min=0.0)
-        robot.set_thrust_target(thrust_cmd)
+        thrust_cmd = (wrench @ world.alloc_pinv.T).clamp(min=0.0)
+        # the faulty motor delivers less than it is told
+        thrust_applied = apply_fault(thrust_cmd, fault, t)
+        robot.set_thrust_target(thrust_applied)
 
         # log the state the controller saw, before stepping
         row = {"step": step, "t": t}
-        for name, vec in (
-            ("pos", _t(robot.data.root_pos_w)),
-            ("quat", _t(robot.data.root_quat_w)),
-            ("lin_vel", _t(robot.data.root_lin_vel_w)),
-            ("ang_vel", _t(robot.data.root_ang_vel_b)),
-        ):
+        for name, vec in state.items():
             labels = "xyzw" if name == "quat" else "xyz"
             for k, a in enumerate(labels):
                 row[f"{name}_{a}"] = float(vec[0, k])
@@ -245,6 +393,15 @@ def fly_a_to_b(args, sim, robot, controller, alloc_pinv):
             row[f"setpoint_{a}"] = float(sp[k])
         for i in range(4):
             row[f"thrust_cmd_{i}"] = float(thrust_cmd[0, i])
+            row[f"thrust_applied_{i}"] = float(thrust_applied[0, i])
+        active = fault is not None and is_active(fault, t)
+        row["fault_active"] = int(active)
+        row["fault_motor"] = fault.motor if fault is not None else -1
+        row["fault_loss"] = fault.loss if fault is not None else 0.0
+        acc, gyro = _t(imu.data.lin_acc_b), _t(imu.data.ang_vel_b)
+        for k, a in enumerate("xyz"):
+            row[f"imu_lin_acc_{a}"] = float(acc[0, k])
+            row[f"imu_ang_vel_{a}"] = float(gyro[0, k])
         yield row
 
         if (
@@ -255,3 +412,4 @@ def fly_a_to_b(args, sim, robot, controller, alloc_pinv):
         robot.write_data_to_sim()
         sim.step()
         robot.update(SIM_DT)
+        imu.update(SIM_DT)

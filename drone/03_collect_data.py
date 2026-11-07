@@ -1,20 +1,30 @@
-"""Step 3: same A->B flight as 02, but log every physics step to a CSV and plot it.
+"""Step 3: the same A->B flight as 02, logged, plotted and scored.
 
-Run (from your IsaacLab folder; add --headless for no window):
-    uv run --extra isaacsim python "<this folder>/03_collect_data.py" --name run1
+Every physics step goes to data/<name>.csv.
 
-Output: data/<name>.csv (one row per step, columns = common.STATE_COLUMNS) and
-data/<name>.png. Load it with pandas.read_csv("data/<name>.csv").
+Run (from the drone folder):
+    # PID, no fault, opens the viewer
+    ./run.sh 03_collect_data.py --name pid_healthy
+    ./run.sh 03_collect_data.py --headless --fault random --fault_seed 1 --name pid_s1
+    # Isaac Lab's Lee controller
+    ./run.sh 03_collect_data.py --headless --controller lee --name check_lee
+
+Output in data/:
+    <name>.csv: one row per physics step (columns = common.STATE_COLUMNS)
+    <name>.png: distance to B, altitude and motor thrust over time, fault marked
+    <name>.json: the run's settings, fault and metrics
+Plots and metrics can be redone later without Isaac:
+    python analysis/plots.py data/<name>.csv
 """
 
+import json
 import pathlib
 
 import common
-import numpy as np
 
 parser = common.build_parser(__doc__)
 parser.add_argument(
-    "--name", default="baseline_lee", help="Output file stem inside data/."
+    "--name", default="baseline_pid", help="Output file stem inside data/."
 )
 args = common.parse_args(__doc__, parser)
 
@@ -29,49 +39,49 @@ def main():
     # NOTE: launch_simulation() ends the whole process when its `with` block exits, so
     # everything (including saving the CSV) must happen inside the block.
     with launch_simulation(cfg=PhysicsCfg(), launcher_args=args) as physics_cfg:
-        sim, robot, controller, alloc_pinv = common.make_world(args, physics_cfg)
-        rows = list(common.fly_a_to_b(args, sim, robot, controller, alloc_pinv))
-        save(rows)
+        world = common.make_world(args, physics_cfg)
+        rows = list(common.fly_a_to_b(args, world))
+        save(rows, world.fault)
 
 
-def save(rows):
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+def save(rows, fault):
     import pandas as pd
+    from analysis.metrics import compute_metrics
+    from analysis.plots import make_plots
 
     df = pd.DataFrame(rows, columns=common.STATE_COLUMNS)
     DATA_DIR.mkdir(exist_ok=True)
     csv_path = DATA_DIR / f"{args.name}.csv"
     df.to_csv(csv_path, index=False)
 
-    goal = np.asarray(args.goal)
-    dist = np.linalg.norm(df[["pos_x", "pos_y", "pos_z"]].to_numpy() - goal, axis=1)
-    print(f"[RESULT] {len(df)} rows -> {csv_path}")
-    speed = np.linalg.norm(
-        df[["lin_vel_x", "lin_vel_y", "lin_vel_z"]].to_numpy(), axis=1
+    make_plots(
+        df,
+        args.start,
+        args.goal,
+        DATA_DIR / f"{args.name}.png",
+        controller=args.controller,
     )
-    print(
-        f"[RESULT] final distance to B: {dist[-1]:.3f} m "
-        f"| min height: {df['pos_z'].min():.2f} m | max speed: {speed.max():.2f} m/s"
-    )
+    metrics = compute_metrics(df, args.start, args.goal)
 
-    fig, ax = plt.subplots(3, 1, figsize=(8, 8), sharex=True)
-    for a in "xyz":
-        ax[0].plot(df["t"], df[f"pos_{a}"], label=f"pos_{a}")
-        ax[0].plot(df["t"], df[f"setpoint_{a}"], "--", alpha=0.5)
-    ax[0].set_ylabel("position [m] (dashed = setpoint)")
-    ax[0].legend()
-    ax[1].plot(df["t"], dist)
-    ax[1].set_ylabel("distance to B [m]")
-    for i in range(4):
-        ax[2].plot(df["t"], df[f"thrust_cmd_{i}"], label=f"prop {i}")
-    ax[2].set_ylabel("thrust cmd [N]")
-    ax[2].set_xlabel("time [s]")
-    ax[2].legend()
-    fig.tight_layout()
-    fig.savefig(DATA_DIR / f"{args.name}.png", dpi=120)
+    summary = {
+        "name": args.name,
+        "controller": args.controller,
+        "start": args.start,
+        "goal": args.goal,
+        "speed": args.speed,
+        "hold": args.hold,
+        "fault_mode": args.fault,
+        "fault_seed": args.fault_seed,
+        "fault": fault.to_dict() if fault is not None else None,
+        "metrics": metrics,
+    }
+    with open(DATA_DIR / f"{args.name}.json", "w") as f:
+        json.dump(summary, f, indent=2)
+
+    print(f"[RESULT] {len(df)} rows -> {csv_path}")
+    print(f"[RESULT] controller={args.controller}  fault={summary['fault']}")
+    for key, value in metrics.items():
+        print(f"[RESULT]   {key:26s} {value}")
 
 
 if __name__ == "__main__":

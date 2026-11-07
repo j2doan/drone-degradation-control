@@ -21,15 +21,22 @@ def main():
     from isaaclab.physics import PhysicsCfg
 
     with launch_simulation(cfg=PhysicsCfg(), launcher_args=args) as physics_cfg:
-        sim, robot, controller, alloc_pinv = common.make_world(args, physics_cfg)
+        world = common.make_world(args, physics_cfg)
         goal = np.asarray(args.goal)
         print(
             f"[INFO] Flying A={args.start} -> B={args.goal} at {args.speed} m/s, "
             f"then hovering {args.hold}s"
         )
 
+        print(f"[INFO] controller={args.controller}  fault={world.fault}")
+
         last = None
-        for row in common.fly_a_to_b(args, sim, robot, controller, alloc_pinv):
+        for row in common.fly_a_to_b(args, world):
+            if row["fault_active"] and (last is None or not last["fault_active"]):
+                print(
+                    f"[FAULT] t={row['t']:.2f}s  motor {row['fault_motor']} lost "
+                    f"{row['fault_loss']:.0%} of its thrust"
+                )
             last = row
             if row["step"] % int(1 / common.SIM_DT) == 0:  # once per simulated second
                 pos = np.array([row["pos_x"], row["pos_y"], row["pos_z"]])
