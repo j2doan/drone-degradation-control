@@ -9,18 +9,20 @@ Run (from the drone folder):
     ./run.sh 03_collect_data.py --name s37 --seeds 3 7 --headless
     # also record the front camera (slower)
     ./run.sh 03_collect_data.py --name cam --runs 2 --camera --headless
+    # the same batch in MuJoCo (no Isaac)
+    ./run.sh 03_collect_data.py --sim mujoco --name mj1 --runs 5 --headless
 
 Each seed has its own random curved path; seeds >= 1 also get a random fault (seed 0 is
 the healthy reference). Every available drone (drones.py; today only d0 = PID) flies
 every seed. Output in data/<name>/:
-    manifest.json: receipt (Isaac Lab commit, GPU, versions, gains, settings, code)
+    manifest.json: receipt (simulator, GPU, versions, gains, settings, code hashes)
     summary.csv: one row per seed x drone (path, fault, feasibility, metrics)
     seed<k>/<drone>/flight.csv: one row per physics step (columns = STATE_COLUMNS)
     seed<k>/<drone>/flight.png: distance to B, altitude and motor thrust over time
     seed<k>/<drone>/flight.json: path, fault, feasibility, metrics
     (+ camera.npz and camera_preview.png with --camera)
 An existing data/<name>/ is never overwritten unless --overwrite is given. Plots and
-metrics can be redone later without Isaac:
+metrics can be redone later without a simulator:
     python analysis/plots.py data/<name>/seed1/d0/flight.csv
 """
 
@@ -62,7 +64,7 @@ SEEDS = (
 if args.runs < 0 or any(s < 0 for s in SEEDS):
     parser.error("--runs and --seeds must be >= 0")
 
-# Refuse to overwrite an earlier run (checked before Isaac starts, so it costs nothing).
+# Refuse to overwrite an earlier run (checked before the simulator starts).
 if RUN_DIR.exists():
     if not args.overwrite:
         raise SystemExit(
@@ -73,13 +75,10 @@ if RUN_DIR.exists():
 
 def main():
     from drones import available
-    from isaaclab.app import launch_simulation
 
-    # NOTE: launch_simulation() ends the whole process when its `with` block exits, so
-    # everything (including saving) must happen inside the block.
-    with launch_simulation(
-        cfg=common.launch_cfg(args), launcher_args=args
-    ) as physics_cfg:
+    # NOTE: with Isaac the whole process ends when the `with` block exits, so everything
+    # (including saving) must happen inside the block.
+    with common.session(args) as physics_cfg:
         world = common.make_world(args, physics_cfg)
         RUN_DIR.mkdir(parents=True)
         (RUN_DIR / "manifest.json").write_text(

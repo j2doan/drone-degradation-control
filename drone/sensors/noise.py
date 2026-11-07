@@ -2,10 +2,11 @@
 
 Seeded and batched.
 
-Isaac's IMU is perfect. A real MEMS IMU is not: each axis has a small offset (bias) that
-stays roughly constant over one flight, plus random jitter (white noise) on every
-sample. ImuNoise adds both to the clean readings `lin_acc_b` (proper acceleration, body
-frame, ~+9.81 on z at hover) [m/s^2] and `ang_vel_b` [rad/s], both (N,3).
+The simulated IMU (Isaac or MuJoCo) is perfect. A real MEMS IMU is not: each axis has a
+small offset (bias) that stays roughly constant over one flight, plus random jitter
+(white noise) on every sample. ImuNoise adds both to the clean readings `lin_acc_b`
+(proper acceleration, body frame, ~+9.81 on z at hover) [m/s^2] and `ang_vel_b` [rad/s],
+both (N,3).
 
 Seeded with its own torch.Generator, so the same seed gives the same noise sequence,
 independent of the other seeded streams (faults, PPO, torch's global RNG).

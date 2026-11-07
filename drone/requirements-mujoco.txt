@@ -1,0 +1,8 @@
+# MuJoCo backend (--sim mujoco): CPU only, no Isaac or NVIDIA GPU needed. From the drone folder:
+#     python -m venv .venv-mujoco
+#     .venv-mujoco/Scripts/python -m pip install -r requirements-mujoco.txt      (Linux/macOS: .venv-mujoco/bin/python)
+mujoco>=3.1.6,<4
+numpy>=1.26,<3
+torch>=2.9,<3
+pandas>=2.2,<4
+matplotlib>=3.9,<4
