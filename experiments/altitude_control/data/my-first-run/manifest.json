@@ -1,0 +1,672 @@
+{
+  "created_at_utc": "2026-10-19T00:18:35.850910+00:00",
+  "python_version": "3.14.2 (main, Dec  5 2025, 16:49:16) [Clang 17.0.0 (clang-1700.4.4.1)]",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "model": "1D vertical point mass, zero actuator lag, perfectly stabilized attitude",
+  "status": "baseline engineering checks; no learned policy or Isaac integration",
+  "base_config": {
+    "dt_s": 0.02,
+    "duration_s": 15.0,
+    "target_m": 1.5,
+    "initial_z_m": 1.5,
+    "initial_vz_m_s": 0.0,
+    "mass_kg": 1.0,
+    "gravity_m_s2": 9.81,
+    "thrust_to_weight": 2.5,
+    "fault_time_s": 5.0,
+    "eta_after": 0.75,
+    "noise_z_m": 0.01,
+    "noise_vz_m_s": 0.03,
+    "min_altitude_m": 0.05,
+    "max_altitude_m": 4.0
+  },
+  "methods": [
+    "pid",
+    "adaptive",
+    "oracle"
+  ],
+  "etas": [
+    1.0,
+    0.9,
+    0.75
+  ],
+  "noise_z_levels_m": [
+    0.0,
+    0.01
+  ],
+  "velocity_noise_multiplier": 3.0,
+  "episodes_per_condition": 5,
+  "first_seed": 0,
+  "controller_settings": {
+    "pid_gains": {
+      "kp": 5.0,
+      "kd": 3.5,
+      "ki": 2.0
+    },
+    "anti_windup": "conditional integration at final command limits",
+    "adaptive_estimator": {
+      "estimation_window_s": 0.2,
+      "forgetting_factor": 0.9,
+      "initial_covariance": 10.0,
+      "eta_min": 0.4,
+      "eta_max": 1.2
+    },
+    "oracle": "Same PID with true effectiveness, diagnostic only"
+  },
+  "source_sha256": {
+    "__init__.py": "220e5a3b5ccbe0083624ba7d11edb91b3ad128679c1fc040dc9875698f98f8f7",
+    "core.py": "1b26e8df47865d34b7f3aef2b0770b7907d5e96fdb942ced8d4c200ea54ad47f",
+    "experiment.py": "d4d6c9656adae62e191895b1f4ac5dcc4f78fe6557a9b9e4b04557970306717a",
+    "metrics.py": "5637c1782b74122d17c3e74a05b193f9296d9fa97559de17792877ddff1c21af",
+    "plot.py": "b50379bf13a33af59f8a9c952341cfdb2e021e0a974f42d5972c614c936d00d1",
+    "run.py": "fbc5f656166fc6a01e9c17c5d559a72eff56b4646b220e6f345f7063833929f2"
+  },
+  "metrics": {
+    "horizon_s": 8.0,
+    "position_tolerance_m": 0.1,
+    "velocity_tolerance_m_s": 0.15,
+    "hold_s": 1.0
+  },
+  "scenarios": [
+    {
+      "scenario_id": "eta1.0_noise0.0_seed0",
+      "seed": 0,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 5.0600000000000005,
+        "eta_after": 1.0,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta1.0_noise0.0_seed1",
+      "seed": 1,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 5.0,
+        "eta_after": 1.0,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta1.0_noise0.0_seed2",
+      "seed": 2,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 4.1,
+        "eta_after": 1.0,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta1.0_noise0.0_seed3",
+      "seed": 3,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 4.38,
+        "eta_after": 1.0,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta1.0_noise0.0_seed4",
+      "seed": 4,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 6.1000000000000005,
+        "eta_after": 1.0,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta1.0_noise0.01_seed0",
+      "seed": 0,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 5.0600000000000005,
+        "eta_after": 1.0,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta1.0_noise0.01_seed1",
+      "seed": 1,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 5.0,
+        "eta_after": 1.0,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta1.0_noise0.01_seed2",
+      "seed": 2,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 4.1,
+        "eta_after": 1.0,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta1.0_noise0.01_seed3",
+      "seed": 3,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 4.38,
+        "eta_after": 1.0,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta1.0_noise0.01_seed4",
+      "seed": 4,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 6.1000000000000005,
+        "eta_after": 1.0,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.9_noise0.0_seed0",
+      "seed": 0,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 5.0600000000000005,
+        "eta_after": 0.9,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.9_noise0.0_seed1",
+      "seed": 1,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 5.0,
+        "eta_after": 0.9,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.9_noise0.0_seed2",
+      "seed": 2,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 4.1,
+        "eta_after": 0.9,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.9_noise0.0_seed3",
+      "seed": 3,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 4.38,
+        "eta_after": 0.9,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.9_noise0.0_seed4",
+      "seed": 4,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 6.1000000000000005,
+        "eta_after": 0.9,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.9_noise0.01_seed0",
+      "seed": 0,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 5.0600000000000005,
+        "eta_after": 0.9,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.9_noise0.01_seed1",
+      "seed": 1,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 5.0,
+        "eta_after": 0.9,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.9_noise0.01_seed2",
+      "seed": 2,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 4.1,
+        "eta_after": 0.9,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.9_noise0.01_seed3",
+      "seed": 3,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 4.38,
+        "eta_after": 0.9,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.9_noise0.01_seed4",
+      "seed": 4,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 6.1000000000000005,
+        "eta_after": 0.9,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.75_noise0.0_seed0",
+      "seed": 0,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 5.0600000000000005,
+        "eta_after": 0.75,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.75_noise0.0_seed1",
+      "seed": 1,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 5.0,
+        "eta_after": 0.75,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.75_noise0.0_seed2",
+      "seed": 2,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 4.1,
+        "eta_after": 0.75,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.75_noise0.0_seed3",
+      "seed": 3,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 4.38,
+        "eta_after": 0.75,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.75_noise0.0_seed4",
+      "seed": 4,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 6.1000000000000005,
+        "eta_after": 0.75,
+        "noise_z_m": 0.0,
+        "noise_vz_m_s": 0.0,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.75_noise0.01_seed0",
+      "seed": 0,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 5.0600000000000005,
+        "eta_after": 0.75,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.75_noise0.01_seed1",
+      "seed": 1,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 5.0,
+        "eta_after": 0.75,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.75_noise0.01_seed2",
+      "seed": 2,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 4.1,
+        "eta_after": 0.75,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.75_noise0.01_seed3",
+      "seed": 3,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 4.38,
+        "eta_after": 0.75,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    },
+    {
+      "scenario_id": "eta0.75_noise0.01_seed4",
+      "seed": 4,
+      "config": {
+        "dt_s": 0.02,
+        "duration_s": 15.0,
+        "target_m": 1.5,
+        "initial_z_m": 1.5,
+        "initial_vz_m_s": 0.0,
+        "mass_kg": 1.0,
+        "gravity_m_s2": 9.81,
+        "thrust_to_weight": 2.5,
+        "fault_time_s": 6.1000000000000005,
+        "eta_after": 0.75,
+        "noise_z_m": 0.01,
+        "noise_vz_m_s": 0.03,
+        "min_altitude_m": 0.05,
+        "max_altitude_m": 4.0
+      }
+    }
+  ]
+}
