@@ -52,7 +52,13 @@ cd PATH_TO_THIS_DRONE_DIRECTORY
 Each run of `03_collect_data.py` writes to `data/`:
 - `<name>.csv`: one row per physics step (100 Hz), columns listed below
 - `<name>.png`: one figure, 3 panels over time, with a one-line run summary on top (see "How to read an output figure")
-- `<name>.json`: the settings, the fault and the metrics
+- `<name>.json`: the settings, the fault, the metrics, a **feasibility** check (could the damaged drone physically
+  hover at all with its motor limits? if not, a crash is not the controller's fault) and a **receipt** (Isaac Lab
+  commit, GPU, Python/torch versions, controller gains, all settings, the command, and a hash of every code file), so
+  any result can be traced back to exactly how it was produced
+
+An existing run is never overwritten: reusing a `--name` stops with an error before Isaac starts, unless you add
+`--overwrite`.
 
 The first launch takes about a minute; headless runs take about 30 s.
 
@@ -75,6 +81,8 @@ Options for steps 2 and 3:
 | `--start X Y Z` / `--goal X Y Z` | Points A and B in meters (Z is height) | 0 0 1 / 3 0 1 |
 | `--speed 0.5` | Speed of the moving target point, m/s | 0.5 |
 | `--max_steps N` | Stop after N physics steps (0.01 s each) | no limit |
+| `--max_thrust 6` | Per-motor command cap in newtons (same limit as Isaac Lab's drone RL env) | 6 |
+| `--overwrite` | Allow replacing an existing run with the same `--name` (step 3) | off |
 | `--headless` | No window | window opens |
 
 Random faults: one motor (0-3) loses 10-50% of its thrust, starting while the drone is still travelling: between 3 s
@@ -109,28 +117,31 @@ Seven D0 flights on the verified machine: the healthy drone and fault seeds 0-5.
 
 ### How to read it
 Each run writes three files to `data/`:
-1. **`<name>.json`** first: the settings, the fault and every
-   [metric](#metrics-analysismetricspy-tolerances-are-constants-at-the-top).
+1. **`<name>.json`** first: the settings, the fault, the feasibility check (the thrust each motor needs to hover vs.
+   the most the damaged motor can still give), every
+   [metric](#metrics-analysismetricspy-tolerances-are-constants-at-the-top) and the receipt (see
+   [below](#can-these-numbers-still-be-reproduced)).
 2. **`<name>.png`**: what happened in that flight, over time (see
    [How to read an output figure](#how-to-read-an-output-figure)).
 3. **`<name>.csv`**: the full log, one row per physics step, for your own analysis.
 
-Seed "none" is the healthy reference; every other seed loses part of one motor's thrust. The table below is the
-seven `<name>.json` files in short.
+Seed "none" is the healthy reference; every other seed loses part of one motor's thrust. **Survivable** means the
+damaged drone could still hover level with its motor limits (feasibility check), so a crash on a survivable fault is
+the controller's failure, not physics. The table below is the seven `<name>.json` files in short.
 
-| Seed | Fault | Final distance to B | Max drop below target | Recovery | Crashed |
-|---|---|---|---|---|---|
-| none | - | 0.023 m | - | - | no |
-| 0 | motor 3, -21% at 3.08 s | 0.024 m | 0.29 m | 4.6 s | no |
-| 1 | motor 1, -48% at 3.29 s | - | 0.75 m | - | **yes**, 4.45 s |
-| 2 | motor 3, -22% at 4.63 s | 0.010 m | 0.45 m | 4.9 s | no |
-| 3 | motor 3, -19% at 4.60 s | 0.012 m | 0.40 m | 4.6 s | no |
-| 4 | motor 2, -30% at 4.95 s | - | 0.73 m | - | **yes**, 7.05 s (skimmed the ground, then flew on to B) |
-| 5 | motor 2, -42% at 4.03 s | - | 0.75 m | - | **yes**, 5.36 s |
+| Seed | Fault | Survivable | Final distance to B | Max drop below target | Recovery | Crashed |
+|---|---|---|---|---|---|---|
+| none | - | - | 0.020 m | - | - | no |
+| 0 | motor 3, -21% at 3.08 s | yes | 0.024 m | 0.29 m | 4.5 s | no |
+| 1 | motor 1, -48% at 3.29 s | yes | - | 0.75 m | - | **yes**, 4.44 s |
+| 2 | motor 3, -22% at 4.63 s | yes | 0.010 m | 0.45 m | 4.9 s | no |
+| 3 | motor 3, -19% at 4.60 s | yes | 0.012 m | 0.40 m | 4.5 s | no |
+| 4 | motor 2, -30% at 4.95 s | yes | - | 0.73 m | - | **yes**, 6.98 s (skimmed the ground, then flew on to B) |
+| 5 | motor 2, -42% at 4.03 s | yes | - | 0.75 m | - | **yes**, 5.31 s |
 
 "Recovery" is the time from the fault until the height is back near the target. The PID survives losses around 20%
-and crashes at 30% and above (seeds 1, 4, 5). For reference, Isaac Lab's Lee controller ends 0.007 m from B on the
-healthy drone.
+and crashes at 30% and above (seeds 1, 4, 5). All three faults were survivable. For reference, Isaac Lab's Lee
+controller ends 0.007 m from B on the healthy drone.
 
 ## How to read an output figure
 
@@ -143,24 +154,41 @@ healthy drone.
 - Red dashed vertical line = the fault starts. Red solid vertical line = crash; every line stops there.
 
 ### Can these numbers still be reproduced?
-Only with this version's code, and the code will keep changing. Changing a constant (a PID gain, the motor cap, the
-fault ranges) gives the same seed a different fault or outcome, and the table above no longer applies. So treat these
-numbers as a record of this version, not as what later code must produce.
+Only with the exact code that made them, and the code will keep changing. Each run's `<name>.json` records that code
+in its receipt: a short SHA-256 hash of every `.py` file at the time of the run. Two kinds of change matter:
+- **Any edit changes a hash.** The hash is taken over the file's bytes, so even a comment, a reformat, or a checkout
+  that converts line endings (Git's `autocrlf` on Windows) breaks the match. Such edits leave the flights unchanged,
+  but the receipt can no longer prove it.
+- **Changing a constant changes the flights.** PID gains, the motor cap and the fault ranges sit at the top of their
+  files. Edit one and the same seed gives a different fault or outcome, and the table above no longer applies.
+
+So treat these numbers as a record of this version, not as what later code must produce.
 
 ## About the PID baseline: FAQ
 
-1. **What does the PID control, and how?**
+1. **Why our own PID and not Isaac Lab's built-in Lee controller?**
+Two reasons. Lee has **no integral term** (it reacts only to the current error), so under a constant fault it settles
+offset from B or too low. That would make a weaker-than-realistic baseline and overstate any PPO gain. Lee is also
+**tied to Isaac Lab** (it reads Isaac's robot data directly), while our PID is plain PyTorch math on arrays, so it also
+runs in MuJoCo or inside a batched RL training environment.
+
+2. **What does the PID control, and how?**
 It is a cascade: position error -> desired tilt + thrust -> body torques -> 4 motor thrusts. It has integral terms on
 height and on attitude (tilt and heading), with anti-windup limits. The gains are constants at the top of
 `controllers/pid.py` (`PIDGains`).
 
-2. **Why an integral term on attitude?**
+3. **Why an integral term on attitude?**
 Without it, a weak motor leaves the drone settled level but 0.2-0.4 m away from B: the controller needs a leftover
 error to keep pushing the weak motor harder. Real flight controllers (e.g. PX4) use attitude integrators for the same
 reason.
 
-3. **How much thrust loss does the PID survive?**
-In the [sample baseline run](#sample-baseline-run) it survives losses around 20% and crashes at 30% and above.
+4. **How much thrust loss could the drone survive in principle?**
+With the 6 N cap, a level hover stays physically possible up to about 49% loss on one motor. Each run checks this
+for its own fault (feasibility check in `<name>.json`).
+
+5. **And how much does the PID actually survive?**
+In the [sample baseline run](#sample-baseline-run) it survives losses around 20% and crashes at 30% and above,
+although every one of those faults was survivable. That gap is what D1-D3 try to close.
 
 ## Files
 - `run.sh` / `run.ps1`: launchers; the Isaac Lab path is set at the top of each.
@@ -168,8 +196,8 @@ In the [sample baseline run](#sample-baseline-run) it survives losses around 20%
   fault) and runs the flight loop. Steps 1 to 3 share it.
 - `controllers/pid.py`: cascaded PID (position -> desired tilt + thrust -> body torques), pure PyTorch, batched over
   many drones. Gains are constants at the top (`PIDGains`). `test_pid.py` tests it on a toy drone model.
-- `faults/thrust_loss.py`: `FaultSpec`, the seeded `sample_fault`, `run_duration`, and `apply` (scales the faulty
-  motor's command).
+- `faults/thrust_loss.py`: `FaultSpec`, the seeded `sample_fault`, `run_duration`, `apply` (scales the faulty motor's
+  thrust) and `hover_feasibility` (can the damaged drone physically hover with its motor limits?).
 - `analysis/`: `metrics.py`, `plots.py`, `route.py` (progress along / deviation from the A->B line).
 - **Viewer lines** (when not `--headless`): green = ideal straight path A to B, red = path the drone actually flew.
 - `data/`: run outputs (not tracked by git). CSV columns: `step, t, pos_xyz, quat_xyzw,
@@ -191,7 +219,10 @@ In the [sample baseline run](#sample-baseline-run) it survives losses around 20%
 ## Things worth knowing
 - **How the flight works:** a target point moves along the line A to B at `--speed`, then stops at B. The controller
   turns "where am I vs. the target" into a force and torques; a pseudoinverse of the allocation matrix converts that
-  into 4 propeller thrusts; the fault then scales the faulty motor's thrust before it reaches the drone.
+  into 4 propeller thrusts, each capped at `--max_thrust` (6 N). Isaac's motor model then adds spin-up lag and its
+  0.1-10 N limit, and **the fault damages the faulty motor's output** after that: a motor that lost 30% can never
+  deliver more than 70% of its maximum, however hard the controller asks. The CSV logs both what was asked
+  (`thrust_cmd_*`) and what each motor delivered (`thrust_applied_*`).
 - **Initial sag:** the drone spawns with the propellers not yet at hover thrust, so it dips from 1.0 m to about
   0.45 m in the first second. Faults start after 3 s for this reason.
 - **Ground height:** the logged height is the drone body's reference point, which sits 0.25 m above the ground when the
