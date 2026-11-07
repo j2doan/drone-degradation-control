@@ -1,0 +1,39 @@
+{
+  "name": "pid_s1",
+  "controller": "pid",
+  "start": [
+    0.0,
+    0.0,
+    1.0
+  ],
+  "goal": [
+    3.0,
+    0.0,
+    1.0
+  ],
+  "speed": 0.5,
+  "hold": 3.0,
+  "fault_mode": "random",
+  "fault_seed": 1,
+  "fault": {
+    "motor": 1,
+    "loss": 0.4801854785303742,
+    "onset_t": 3.2883192254392677
+  },
+  "metrics": {
+    "final_dist_to_B": NaN,
+    "path_length": 5.405336809936166,
+    "max_deviation": 0.8419788792829278,
+    "mean_deviation": 0.4710229443435231,
+    "max_sideways_drift": 0.4774067997932434,
+    "time_to_arrive": NaN,
+    "smoothness": 0.010688622058920152,
+    "fault_motor": 1,
+    "fault_loss": 0.4801854785303742,
+    "fault_onset_t": 3.29,
+    "max_alt_loss_after_fault": 0.7511852979660034,
+    "recovery_time": NaN,
+    "crashed": true,
+    "crash_t": 4.45
+  }
+}

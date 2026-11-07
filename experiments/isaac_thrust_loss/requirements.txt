@@ -1,0 +1,5 @@
+# Python dependencies; Isaac flights use an installed Isaac Lab/Sim environment.
+numpy>=1.26,<3
+torch>=2.9,<3
+pandas>=2.2,<4
+matplotlib>=3.9,<4
