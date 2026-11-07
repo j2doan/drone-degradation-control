@@ -1,0 +1,17 @@
+\centering
+\begin{tabular}{lll}
+  \toprule
+  Group    & Description                                 & Size \\
+  \midrule
+  Target   & Target position relative to the drone (m)   & 3 \\
+           & Target velocity relative to the drone (m/s) & 3 \\
+  State    & Drone velocity (m/s)                        & 3 \\
+           & Orientation (quaternion)                    & 4 \\
+           & Angular velocity (rad/s)                    & 3 \\
+  IMU      & Accelerometer, noisy (m/s$^2$)              & 3 \\
+           & Gyroscope, noisy (rad/s)                    & 3 \\
+  Action   & Last thrust command per motor (N)           & 4 \\
+  \midrule
+  Total    &                                             & 26 \\
+  \bottomrule
+\end{tabular}
