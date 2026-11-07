@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+
+# Generated experiment data (recreated by the experiment script)
+data/
