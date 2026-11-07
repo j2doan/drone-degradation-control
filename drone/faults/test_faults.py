@@ -19,6 +19,7 @@ from faults.thrust_loss import (
     SETTLE_T,
     FaultSpec,
     apply,
+    hover_feasibility,
     is_active,
     run_duration,
     sample_fault,
@@ -68,6 +69,30 @@ def test_run_duration():
     # extended to 10 s after the fault
     assert run_duration(9.0, FaultSpec(0, 0.2, 4.0)) == 4.0 + POST_FAULT_T
     assert run_duration(30.0, FaultSpec(0, 0.2, 4.0)) == 30.0  # already long enough
+
+
+def test_hover_feasibility():
+    # ARL Robot 1: 1.24 kg, hover needs ~3.04 N per motor; with a 6 N cap the faulty
+    # motor needs loss <= ~49.3%
+    alloc = [
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [1, 1, 1, 1],
+        [-0.13, -0.13, 0.13, 0.13],
+        [-0.13, 0.13, 0.13, -0.13],
+        [-0.07, 0.07, -0.07, 0.07],
+    ]
+    healthy = hover_feasibility(alloc, 1.24, None, 6.0)
+    assert (
+        healthy["feasible"]
+        and abs(healthy["hover_thrust_per_motor_n"][0] - 1.24 * 9.81 / 4) < 1e-6
+    )
+    assert hover_feasibility(alloc, 1.24, FaultSpec(1, 0.30, 4.0), 6.0)["feasible"]
+    # 6 N * 0.5 = 3.0 N < 3.04 N needed
+    severe = hover_feasibility(alloc, 1.24, FaultSpec(1, 0.50, 4.0), 6.0)
+    assert not severe["feasible"] and severe["feasible_if_spinning"]
+    # cap below hover thrust: nothing can hover
+    assert not hover_feasibility(alloc, 1.24, None, 3.0)["feasible"]
 
 
 def test_too_short():

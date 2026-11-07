@@ -17,6 +17,10 @@ from types import SimpleNamespace
 from isaaclab.app import add_launcher_args
 
 SIM_DT = 0.01  # physics step, seconds (same as the RL env)
+# Per-motor command cap [N], about 2x hover thrust. Same limit as Isaac Lab's drone RL
+# env (actions 0-6 N), so the baseline and the future PPO drones play by the same rules.
+# The motor model itself allows 0.1-10 N.
+MAX_MOTOR_THRUST = 6.0
 
 # One row of the log = one physics step. Order matters: it is the CSV column order.
 STATE_COLUMNS = (
@@ -26,9 +30,10 @@ STATE_COLUMNS = (
     + [f"lin_vel_{a}" for a in "xyz"]  # world-frame linear velocity [m/s]
     + [f"ang_vel_{a}" for a in "xyz"]  # body-frame angular velocity [rad/s]
     + [f"setpoint_{a}" for a in "xyz"]  # where the controller was told to go
-    # thrust the controller asked for, per propeller [N]
+    # thrust the controller asked for, per propeller, before the cap [N]
     + [f"thrust_cmd_{i}" for i in range(4)]
-    # thrust actually sent after the fault [N]
+    # thrust the motor actually delivered: after the cap, the motor model (lag, 0.1-10
+    # N) and the fault [N]
     + [f"thrust_applied_{i}" for i in range(4)]
     # 0/1, motor index (-1 = none), lost fraction
     + ["fault_active", "fault_motor", "fault_loss"]
@@ -107,6 +112,18 @@ def build_parser(description: str) -> argparse.ArgumentParser:
         help="Fault start time [s] for --fault fixed.",
     )
     parser.add_argument(
+        "--max_thrust",
+        type=float,
+        default=MAX_MOTOR_THRUST,
+        help="Per-motor command cap in newtons "
+        "(default 6, like the Isaac Lab drone RL env).",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Allow replacing an existing run with the same name.",
+    )
+    parser.add_argument(
         "--physics",
         default="isaacsim_physx",
         choices=["isaacsim_physx"],
@@ -165,13 +182,44 @@ def make_fault(args):
     return None
 
 
+def install_fault_hook(robot, fault):
+    """Damage the faulty motor itself, not the order it receives.
+
+    Wraps Isaac's thruster model so the fault scales the motor's OUTPUT, after its lag
+    and its 0.1-10 N limit. The multirotor sends whatever `actuator.compute(...)`
+    returns to the physics (Multirotor._apply_actuator_model in isaaclab_contrib,
+    verified on the installed Isaac Lab), so a motor that lost 30% can never deliver
+    more than 70% of its maximum. Returns (actuator, clock); set clock.t to the current
+    time before robot.write_data_to_sim().
+    """
+    from faults.thrust_loss import apply as apply_fault
+
+    actuator = robot.actuators["thrusters"]
+    clock = SimpleNamespace(t=0.0)
+    if fault is None:
+        return actuator, clock
+    nominal_compute = actuator.compute  # the healthy motor model
+
+    def damaged_compute(control_action):
+        out = nominal_compute(control_action)
+        # new tensor; the motor model's own state is untouched
+        out.thrusts = apply_fault(out.thrusts, fault, clock.t)
+        # keep Isaac's logged value equal to what the physics receives
+        actuator.applied_thrust = out.thrusts
+        return out
+
+    actuator.compute = damaged_compute
+    return actuator, clock
+
+
 def make_world(args, physics_cfg):
     """Create sim, ground, light, robot at point A, IMU, controller and fault.
 
     Call inside launch_simulation().
 
     Returns a namespace with: sim, robot, imu, controller (the one flying), lee (always
-    built: it also provides the drone's mass and inertia), alloc_pinv, fault.
+    built: it also provides the drone's mass and inertia), alloc_pinv, fault, actuator +
+    fault_clock (the fault hook), feasibility.
     """
     import isaaclab.sim as sim_utils
     import torch
@@ -238,6 +286,19 @@ def make_world(args, physics_cfg):
         robot_cfg.allocation_matrix, device=sim.device, dtype=torch.float32
     )
     alloc_pinv = torch.linalg.pinv(alloc)  # (4, 6)
+
+    from faults.thrust_loss import hover_feasibility
+
+    fault = make_fault(args)
+    actuator, fault_clock = install_fault_hook(robot, fault)
+    # can the damaged drone physically hover with these motor limits? (if not, a crash
+    # is not the controller's fault)
+    feasibility = hover_feasibility(
+        robot_cfg.allocation_matrix,
+        float(lee.mass.flatten()[0]),
+        fault,
+        args.max_thrust,
+    )
     return SimpleNamespace(
         sim=sim,
         robot=robot,
@@ -245,8 +306,78 @@ def make_world(args, physics_cfg):
         controller=controller,
         lee=lee,
         alloc_pinv=alloc_pinv,
-        fault=make_fault(args),
+        fault=fault,
+        actuator=actuator,
+        fault_clock=fault_clock,
+        feasibility=feasibility,
     )
+
+
+def make_receipt(args, world) -> dict:
+    """Everything needed to say later exactly how a run was produced.
+
+    Saved in <name>.json as "receipt".
+    """
+    import dataclasses
+    import datetime
+    import hashlib
+    import pathlib
+    import platform
+    import subprocess
+    import sys
+
+    import isaaclab
+    import torch
+
+    drone_dir = pathlib.Path(__file__).resolve().parent
+    code = {
+        str(p.relative_to(drone_dir)).replace("\\", "/"): hashlib.sha256(
+            p.read_bytes()
+        ).hexdigest()[:12]
+        for p in sorted(drone_dir.rglob("*.py"))
+        if "__pycache__" not in p.parts
+    }
+    # .../IsaacLab/source/isaaclab/isaaclab
+    isaaclab_root = pathlib.Path(isaaclab.__file__).resolve().parents[3]
+    try:
+        revision = (
+            subprocess.run(
+                ["git", "-C", str(isaaclab_root), "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            ).stdout.strip()
+            or None
+        )
+    except (OSError, subprocess.SubprocessError):
+        revision = None
+    if args.controller == "pid":
+        gains = dataclasses.asdict(world.controller.gains)
+    else:
+        cfg = world.lee.cfg
+        gains = {
+            k: getattr(cfg, k)
+            for k in ("K_pos_range", "K_vel_range", "K_rot_range", "K_angvel_range")
+        }
+    return {
+        "created": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "command": " ".join(sys.argv[1:]),
+        "isaaclab_revision": revision,
+        "python": platform.python_version(),
+        "torch": torch.__version__,
+        "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+        "controller": args.controller,
+        "gains": gains,
+        "max_motor_thrust_n": args.max_thrust,
+        "sim_dt_s": SIM_DT,
+        "settings": {
+            k: v
+            for k, v in vars(args).items()
+            if isinstance(v, (int, float, str, bool, list, type(None)))
+        },
+        "code_sha256": code,
+    }
 
 
 def _t(x):
@@ -328,7 +459,6 @@ def fly_a_to_b(args, world):
     Yields one dict per step (keys = STATE_COLUMNS).
     """
     import torch
-    from faults.thrust_loss import apply as apply_fault
     from faults.thrust_loss import is_active
 
     sim, robot, imu, controller, fault = (
@@ -377,13 +507,17 @@ def fly_a_to_b(args, world):
             command = torch.zeros((1, 4), device=sim.device)
             command[0, :3] = torch.tensor(sp, device=sim.device)
             wrench = controller.compute(command)
-        # propellers can't pull down
+        # what the controller asks; propellers can't pull
         thrust_cmd = (wrench @ world.alloc_pinv.T).clamp(min=0.0)
-        # the faulty motor delivers less than it is told
-        thrust_applied = apply_fault(thrust_cmd, fault, t)
-        robot.set_thrust_target(thrust_applied)
+        # every motor command is capped
+        robot.set_thrust_target(thrust_cmd.clamp(max=args.max_thrust))
+        world.fault_clock.t = t
+        # runs the motor model, then the fault hook damages the faulty motor's output
+        robot.write_data_to_sim()
+        # what each motor actually delivers this step
+        thrust_applied = _t(world.actuator.applied_thrust)
 
-        # log the state the controller saw, before stepping
+        # log the state the controller saw, and the thrust that results, before stepping
         row = {"step": step, "t": t}
         for name, vec in state.items():
             labels = "xyzw" if name == "quat" else "xyz"
@@ -409,7 +543,6 @@ def fly_a_to_b(args, world):
         ):  # redraw every 5 steps (20 Hz) to keep the viewer smooth
             drawer.update((row["pos_x"], row["pos_y"], row["pos_z"]))
 
-        robot.write_data_to_sim()
         sim.step()
         robot.update(SIM_DT)
         imu.update(SIM_DT)

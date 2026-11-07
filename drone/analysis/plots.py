@@ -47,7 +47,7 @@ FAULTY_MOTOR_COLOR = "tab:orange"
 OTHER_MOTOR_COLOR = "0.7"  # light gray
 
 
-def _title(df, metrics, controller):
+def _title(df, metrics, controller, fault_feasible=None):
     """e.g. 'PID  ·  motor 3 -21% @ 3.16 s  ·  final 0.30 m from B  ·  no crash'"""
     parts = [controller.upper()] if controller else []
     if math.isnan(metrics["fault_onset_t"]):
@@ -58,6 +58,9 @@ def _title(df, metrics, controller):
             f"-{metrics['fault_loss'] * 100:.0f}% thrust "
             f"@ {metrics['fault_onset_t']:.2f} s"
         )
+        if fault_feasible is False:
+            # no controller could hover with these motor limits
+            parts.append("physically unsurvivable")
     if metrics["crashed"]:
         parts.append(f"CRASHED @ {metrics['crash_t']:.1f} s")
     else:
@@ -66,8 +69,11 @@ def _title(df, metrics, controller):
     return "  ·  ".join(parts)
 
 
-def make_plots(df, start, goal, out_path, controller=None):
-    """Save the 3-panel figure to out_path and return the path."""
+def make_plots(df, start, goal, out_path, controller=None, fault_feasible=None):
+    """Save the 3-panel figure to out_path and return the path.
+
+    fault_feasible=False adds a title note.
+    """
     metrics = compute_metrics(df, start, goal)
     onset = fault_onset_index(df)
     t_fault = df["t"].iloc[onset] if onset is not None else None
@@ -80,7 +86,9 @@ def make_plots(df, start, goal, out_path, controller=None):
     z = df[POS[2]].to_numpy()
 
     fig, axes = plt.subplots(3, 1, figsize=(9, 8.5), sharex=True)
-    fig.suptitle(_title(df, metrics, controller), fontsize=11, fontweight="bold")
+    fig.suptitle(
+        _title(df, metrics, controller, fault_feasible), fontsize=11, fontweight="bold"
+    )
 
     # 1. distance to B
     ax = axes[0]
@@ -233,12 +241,18 @@ def main():
 
     start, goal = endpoints_for(args.csv, args.start, args.goal)
     summary = pathlib.Path(args.csv).with_suffix(".json")
-    controller = (
-        json.loads(summary.read_text()).get("controller") if summary.exists() else None
-    )
+    meta = json.loads(summary.read_text()) if summary.exists() else {}
+    feasible = (meta.get("feasibility") or {}).get("feasible")
     out = args.out or pathlib.Path(args.csv).with_suffix(".png")
-    path = make_plots(pd.read_csv(args.csv), start, goal, out, controller=controller)
-    print(f"[RESULT] plot -> {path}")
+    plot = make_plots(
+        pd.read_csv(args.csv),
+        start,
+        goal,
+        out,
+        controller=meta.get("controller"),
+        fault_feasible=feasible,
+    )
+    print(f"[RESULT] plot -> {plot}")
 
 
 if __name__ == "__main__":
