@@ -16,13 +16,15 @@ def main():
     from isaaclab.physics import PhysicsCfg
 
     with launch_simulation(cfg=PhysicsCfg(), launcher_args=args) as physics_cfg:
-        _, robot, controller, _ = common.make_world(args, physics_cfg)
-        d = robot.data
+        world = common.make_world(args, physics_cfg)
+        robot, d = world.robot, world.robot.data
 
         print("\n===== DRONE INSPECTION =====")
         print("thrusters (action order):", d.thruster_names)
         print("number of thrusters     :", robot.num_thrusters)
-        print("total mass [kg]         :", controller.mass.flatten().tolist())
+        print("total mass [kg]         :", world.lee.mass.flatten().tolist())
+        print("inertia [kg m^2]        :", world.lee.robot_inertia[0].tolist())
+        print("flying controller       :", args.controller)
         print("allocation matrix (rows Fx,Fy,Fz,Tx,Ty,Tz; cols = thrusters):")
         print(robot.allocation_matrix)
         thr = robot.cfg.actuators["thrusters"]

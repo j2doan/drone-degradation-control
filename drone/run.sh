@@ -24,7 +24,7 @@ if [ ! -f "$ISAACLAB_DIR/pyproject.toml" ]; then
     exit 1
 fi
 if ! command -v uv >/dev/null 2>&1; then
-    echo "ERROR: 'uv' is not on your PATH. It comes with the Isaac Lab setup; install it from https://docs.astral.sh/uv/"
+    echo "ERROR: 'uv' is not installed on your machine. Install it from https://docs.astral.sh/uv/ or run pip install uv."
     exit 1
 fi
 
