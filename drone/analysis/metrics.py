@@ -2,12 +2,15 @@
 
 The CSV has one row per physics step, columns as in common.STATE_COLUMNS.
 
-Works on old CSVs (no fault columns): the fault metrics are then NaN.
+Works for any route, straight or curved: the route is read from the CSV itself (the
+setpoint columns trace the target point's path, see analysis/route.py), and B defaults
+to the last setpoint. Works on old CSVs (no fault columns): the fault metrics are then
+NaN.
 
 Run (from drone/):
     python analysis/metrics.py data/<name>.csv [--start X Y Z] [--goal X Y Z]
-Start/goal default to "start"/"goal" in data/<name>.json if it exists, else A=(0,0,1),
-B=(3,0,1).
+--start/--goal are optional overrides (added to the route if they differ from its ends);
+normally leave them out.
 """
 
 import pathlib
@@ -20,9 +23,9 @@ import numpy as np
 
 from analysis.route import (
     distance_to,
-    endpoints_for,
-    progress_and_deviation,
-    sideways_offset,
+    progress_and_deviation_polyline,
+    route_from_df,
+    sideways_offset_polyline,
 )
 
 ARRIVE_TOL = 0.10  # m, "arrived" = within this distance of B
@@ -90,13 +93,19 @@ def recovery_time(t, z, z_target, onset):
     return NAN
 
 
-def compute_metrics(df, start, goal) -> dict:
-    """Metrics dict (plain floats/bools, NaN where undefined) for one run."""
+def compute_metrics(df, start=None, goal=None) -> dict:
+    """Metrics dict (plain floats/bools, NaN where undefined) for one run.
+
+    The route is the de-duplicated setpoint polyline; goal (B) defaults to its last
+    point. start/goal, if given, are added to the route's ends when they differ from
+    them.
+    """
     t = df["t"].to_numpy(dtype=float)
     pos = df[POS].to_numpy(dtype=float)
     z = pos[:, 2]
-    dist_b = distance_to(pos, goal)
-    _, dev = progress_and_deviation(pos, start, goal)
+    route = route_from_df(df, start, goal)
+    dist_b = distance_to(pos, route[-1])
+    _, dev = progress_and_deviation_polyline(pos, route)
 
     thrust = df[[f"thrust_cmd_{i}" for i in range(4)]].to_numpy(dtype=float)
     smoothness = float(np.abs(np.diff(thrust, axis=0)).mean()) if len(df) > 1 else NAN
@@ -132,7 +141,7 @@ def compute_metrics(df, start, goal) -> dict:
         "path_length": float(np.linalg.norm(np.diff(pos, axis=0), axis=1).sum()),
         "max_deviation": float(dev.max()),
         "mean_deviation": float(dev.mean()),
-        "max_sideways_drift": float(sideways_offset(pos, start, goal).max()),
+        "max_sideways_drift": float(sideways_offset_polyline(pos, route).max()),
         "time_to_arrive": _first_t(t, dist_b <= ARRIVE_TOL),
         "smoothness": smoothness,
         "fault_motor": motor,
@@ -173,11 +182,18 @@ def main():
     )
     args = parser.parse_args()
 
-    start, goal = endpoints_for(args.csv, args.start, args.goal)
-    metrics = compute_metrics(pd.read_csv(args.csv), start, goal)
+    df = pd.read_csv(args.csv)
+    route = route_from_df(df, args.start, args.goal)
+    metrics = compute_metrics(df, args.start, args.goal)
     print(
         json.dumps(
-            {"csv": str(args.csv), "start": start, "goal": goal, **metrics}, indent=2
+            {
+                "csv": str(args.csv),
+                "start": route[0].tolist(),
+                "goal": route[-1].tolist(),
+                **metrics,
+            },
+            indent=2,
         )
     )
 
