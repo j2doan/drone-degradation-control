@@ -14,8 +14,9 @@ line.
 Run (from drone/):
     python analysis/plots.py data/<name>.csv [--out path.png]
         [--start X Y Z] [--goal X Y Z]
-Default output: data/<name>.png (next to the CSV). Start/goal and controller are read
-from data/<name>.json if present.
+Default output: data/<name>.png (next to the CSV). The route and B come from the CSV's
+setpoint columns (--start/--goal are optional overrides); controller and feasibility are
+read from data/<name>.json if present.
 """
 
 import json
@@ -38,7 +39,7 @@ from analysis.metrics import (
     compute_metrics,
     fault_onset_index,
 )
-from analysis.route import distance_to, endpoints_for
+from analysis.route import distance_to, route_from_df
 
 DRONE_COLOR = "tab:blue"
 TARGET_COLOR = "gray"
@@ -73,8 +74,12 @@ def make_plots(df, start, goal, out_path, controller=None, fault_feasible=None):
     """Save the 3-panel figure to out_path and return the path.
 
     fault_feasible=False adds a title note.
+
+    start/goal may be None: the route then comes from the CSV's setpoint columns, and B
+    is its last point.
     """
     metrics = compute_metrics(df, start, goal)
+    goal = route_from_df(df, start, goal)[-1]  # same B as the metrics
     onset = fault_onset_index(df)
     t_fault = df["t"].iloc[onset] if onset is not None else None
     t_crash = metrics["crash_t"] if metrics["crashed"] else None
@@ -239,7 +244,8 @@ def main():
     )
     args = parser.parse_args()
 
-    start, goal = endpoints_for(args.csv, args.start, args.goal)
+    # None = route and B from the CSV's setpoint columns
+    start, goal = (args.start, args.goal)
     summary = pathlib.Path(args.csv).with_suffix(".json")
     meta = json.loads(summary.read_text()) if summary.exists() else {}
     feasible = (meta.get("feasibility") or {}).get("feasible")

@@ -162,19 +162,42 @@ class CascadedPID:
 
         self.int_pos = torch.zeros(num_envs, 3, device=device)
         self.int_att = torch.zeros(num_envs, 3, device=device)
+        # Anti-windup at the motor cap: True = the last command of this env was clipped
+        # at a motor limit, so the next compute() freezes its integrators (see
+        # set_saturated). Consumed by compute().
+        self.saturated = torch.zeros(num_envs, dtype=torch.bool, device=device)
 
     def reset(self, env_ids=None) -> None:
-        """Zero integrator state for env_ids (all envs when None)."""
+        """Zero the integrators and saturation flag for env_ids (all envs when None)."""
         if env_ids is None:
             env_ids = slice(None)
         self.int_pos[env_ids] = 0.0
         self.int_att[env_ids] = 0.0
+        self.saturated[env_ids] = False
+
+    def set_saturated(self, mask) -> None:
+        """Mark envs whose last command was clipped at a motor limit (bool (N,)).
+
+        The caller clips the motor thrusts after this controller (e.g. at 6 N per
+        motor); while a motor is clipped, integrating the error only winds the
+        integrators up and causes overshoot later. On the next compute() the marked envs
+        skip both integral updates (position and attitude); P and D act as usual. The
+        mask is used once.
+        """
+        mask = torch.as_tensor(mask, dtype=torch.bool, device=self.device).reshape(
+            self.num_envs
+        )
+        self.saturated = mask.clone()
 
     def compute(self, pos, vel, quat_xyzw, ang_vel_b, sp_pos, sp_vel) -> torch.Tensor:
         """Return the (N,6) body-frame wrench [Fx, Fy, Fz, Tx, Ty, Tz] (Fx = Fy = 0)."""
         g = self.gains
         R = quat_to_rotmat(quat_xyzw)  # body -> world
         body_z = R[:, :, 2]
+        # 0 for envs flagged by set_saturated (integrators frozen this step), 1
+        # otherwise; then consume the flag
+        integrate = (~self.saturated).float().unsqueeze(-1)
+        self.saturated = torch.zeros_like(self.saturated)
 
         # ---- outer loop: position PID -> desired acceleration -> desired world force
         pos_err = sp_pos - pos
@@ -182,6 +205,7 @@ class CascadedPID:
         in_zone = (
             (vel_err.abs() < g.i_vel_zone) & (pos_err.abs() < g.i_pos_zone)
         ).float()  # conditional integration
+        in_zone = in_zone * integrate
         self.int_pos = torch.maximum(
             torch.minimum(self.int_pos + in_zone * pos_err * self.dt, self.i_pos_limit),
             -self.i_pos_limit,
@@ -209,7 +233,7 @@ class CascadedPID:
         # e_R = 0.5 vee(R_d^T R - R^T R_d): how far R is rotated past R_d (Lee's sign)
         e_R = 0.5 * vee(R_d.transpose(1, 2) @ R - R.transpose(1, 2) @ R_d)
         self.int_att = torch.maximum(
-            torch.minimum(self.int_att + e_R * self.dt, self.i_att_limit),
+            torch.minimum(self.int_att + integrate * e_R * self.dt, self.i_att_limit),
             -self.i_att_limit,
         )
         # desired body rate = 0 (hover / slow setpoint tracking), as in Lee's controller

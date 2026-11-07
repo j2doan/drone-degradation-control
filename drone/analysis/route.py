@@ -1,10 +1,14 @@
-"""Geometry of the straight A->B route, plus loading of a run's start/goal.
+"""Geometry of a run's route (any path, given as a polyline), plus its start/goal.
 
-progress: how far along A->B the drone is (projection, clamped to [0, |AB|]).
-deviation: distance from the drone to the A->B segment.
-sideways: horizontal distance from the A->B line, i.e. drift to the side (height and
-    overshoot along the line are left out, because the altitude plot and distance to B
-    already show those).
+The route is the polyline traced by the target point: the CSV's setpoint_x/y/z columns
+(route_from_df).
+progress: arc length along the route of the route point closest to the drone.
+deviation: 3-D distance from the drone to the route.
+sideways: horizontal part of the offset from the drone to its closest route point, i.e.
+    drift to the side. The two end segments are extended as lines, so overshooting past
+    B (or behind A) along the route is not counted; height and overshoot are left out
+    because the altitude plot and distance to B already show them. On a straight route
+    this is the horizontal distance from the line through A and B.
 """
 
 import json
@@ -14,36 +18,78 @@ import numpy as np
 
 DEFAULT_START = (0.0, 0.0, 1.0)
 DEFAULT_GOAL = (3.0, 0.0, 1.0)
+SETPOINT = ["setpoint_x", "setpoint_y", "setpoint_z"]
+# drone positions per block in the (positions x segments) distances; bounds memory
+_CHUNK = 256
 
 
-def progress_and_deviation(pos, start, goal):
-    """pos (N,3) -> (progress (N,), deviation (N,)) along segment start->goal."""
-    pos = np.asarray(pos, dtype=float).reshape(-1, 3)
-    start, goal = np.asarray(start, dtype=float), np.asarray(goal, dtype=float)
-    ab = goal - start
-    length = float(np.linalg.norm(ab))
+def route_from_df(df, start=None, goal=None):
+    """(M, 3) route polyline: the setpoint positions with repeats removed.
+
+    The target hovers at B for many rows.
+
+    Optional start/goal are prepended/appended when they differ from the route's own
+    ends.
+    """
+    pts = df[SETPOINT].to_numpy(dtype=float)
+    keep = np.concatenate([[True], np.linalg.norm(np.diff(pts, axis=0), axis=1) > 1e-9])
+    pts = pts[keep]
     if (
-        length == 0.0
-    ):  # degenerate route: no direction, deviation = distance to the point
-        return np.zeros(len(pos)), distance_to(pos, start)
-    progress = np.clip((pos - start) @ (ab / length), 0.0, length)
-    closest = start + progress[:, None] * (ab / length)
+        start is not None
+        and np.linalg.norm(pts[0] - np.asarray(start, dtype=float)) > 1e-9
+    ):
+        pts = np.vstack([np.asarray(start, dtype=float), pts])
+    if (
+        goal is not None
+        and np.linalg.norm(pts[-1] - np.asarray(goal, dtype=float)) > 1e-9
+    ):
+        pts = np.vstack([pts, np.asarray(goal, dtype=float)])
+    return pts
+
+
+def _closest_on_polyline(pos, route, extend_ends=False):
+    """pos (N,3) -> (closest route point (N,3), its arc length along the route (N,)).
+
+    extend_ends=True lets the first/last segment run on past A/B as lines (used for the
+    sideways offset).
+    """
+    pos = np.asarray(pos, dtype=float).reshape(-1, 3)
+    route = np.asarray(route, dtype=float).reshape(-1, 3)
+    if len(route) == 1:  # degenerate route: a single point
+        return np.repeat(route, len(pos), axis=0), np.zeros(len(pos))
+    a, seg = route[:-1], np.diff(route, axis=0)  # (M-1, 3) segment starts and vectors
+    seg_len2 = np.maximum((seg**2).sum(axis=1), 1e-18)
+    cum = np.concatenate([[0.0], np.cumsum(np.sqrt((seg**2).sum(axis=1)))])
+    lo = np.zeros(len(seg))
+    hi = np.ones(len(seg))
+    if extend_ends:
+        lo[0], hi[-1] = -np.inf, np.inf
+    closest = np.empty_like(pos)
+    progress = np.empty(len(pos))
+    for i in range(0, len(pos), _CHUNK):
+        p = pos[i : i + _CHUNK, None, :]  # (n, 1, 3)
+        # (n, M-1) position along each segment
+        u = np.clip(((p - a) * seg).sum(axis=2) / seg_len2, lo, hi)
+        cand = a + u[..., None] * seg  # (n, M-1, 3) closest point on each segment
+        best = ((p - cand) ** 2).sum(axis=2).argmin(axis=1)
+        rows = np.arange(len(best))
+        closest[i : i + _CHUNK] = cand[rows, best]
+        progress[i : i + _CHUNK] = cum[best] + u[rows, best] * np.sqrt(seg_len2[best])
+    return closest, np.clip(progress, 0.0, cum[-1])
+
+
+def progress_and_deviation_polyline(pos, route):
+    """pos (N,3), route (M,3) -> (progress (N,), deviation (N,)) on the polyline."""
+    pos = np.asarray(pos, dtype=float).reshape(-1, 3)
+    closest, progress = _closest_on_polyline(pos, route)
     return progress, np.linalg.norm(pos - closest, axis=1)
 
 
-def sideways_offset(pos, start, goal):
-    """pos (N,3) -> (N,) horizontal distance from the infinite line A->B."""
+def sideways_offset_polyline(pos, route):
+    """pos (N,3), route (M,3) -> (N,) horizontal distance to the closest route point."""
     pos = np.asarray(pos, dtype=float).reshape(-1, 3)
-    start, goal = np.asarray(start, dtype=float), np.asarray(goal, dtype=float)
-    rel = (pos - start)[:, :2]
-    d = (goal - start)[:2]
-    length = float(np.linalg.norm(d))
-    # vertical or degenerate route: no sideways direction; horizontal distance to A
-    if length == 0.0:
-        return np.linalg.norm(rel, axis=1)
-    d = d / length
-    # 2-D cross product = perpendicular distance
-    return np.abs(rel[:, 0] * d[1] - rel[:, 1] * d[0])
+    closest, _ = _closest_on_polyline(pos, route, extend_ends=True)
+    return np.linalg.norm((pos - closest)[:, :2], axis=1)
 
 
 def distance_to(pos, point):

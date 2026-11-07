@@ -123,10 +123,59 @@ def test_batched_and_reset():
     )
 
 
+def test_saturation_freezes_integrators():
+    n = 3
+    pid = CascadedPID(n, MASS, INERTIA, DT)
+    pos, vel, _, w = state(n)
+    # small offset (inside the integration zone) and a slight tilt: both integrals move
+    sp = pos + torch.tensor([[0.1, 0.0, 0.1]] * n)
+    tilt = torch.tensor([[0.05, 0.0, 0.0, 1.0]] * n)
+    tilt = tilt / tilt.norm(dim=-1, keepdim=True)
+    for _ in range(5):
+        pid.compute(pos, vel, tilt, w, sp, torch.zeros(n, 3))
+    before_pos, before_att = pid.int_pos.clone(), pid.int_att.clone()
+    pid.set_saturated(torch.tensor([False, True, False]))
+    pid.compute(pos, vel, tilt, w, sp, torch.zeros(n, 3))
+    assert torch.equal(pid.int_pos[1], before_pos[1]) and torch.equal(
+        pid.int_att[1], before_att[1]
+    )
+    assert (pid.int_pos[[0, 2]] != before_pos[[0, 2]]).any(dim=-1).all()
+    assert (pid.int_att[[0, 2]] != before_att[[0, 2]]).any(dim=-1).all()
+    assert not pid.saturated.any()  # mask consumed
+    # next step (no new mask): env 1 integrates again
+    mid_pos = pid.int_pos.clone()
+    pid.compute(pos, vel, tilt, w, sp, torch.zeros(n, 3))
+    assert (pid.int_pos[1] != mid_pos[1]).any()
+    # reset clears a pending mask
+    pid.set_saturated(torch.ones(n, dtype=torch.bool))
+    pid.reset(torch.tensor([0]))
+    assert pid.saturated.tolist() == [False, True, True]
+    print(
+        "saturation: flagged env kept its integrators for one step, others updated; "
+        "mask consumed; reset clears it"
+    )
+
+
+def test_saturation_never_set_is_unchanged():
+    """set_saturated(all False) gives bit-identical output to never calling it."""
+    pos, vel, q, w = state(2)
+    sp = pos + torch.tensor([[0.3, -0.2, 0.1], [0.0, 0.1, -0.1]])
+    a, b = CascadedPID(2, MASS, INERTIA, DT), CascadedPID(2, MASS, INERTIA, DT)
+    for _ in range(20):
+        b.set_saturated(torch.zeros(2, dtype=torch.bool))
+        assert torch.equal(
+            a.compute(pos, vel, q, w, sp, torch.zeros(2, 3)),
+            b.compute(pos, vel, q, w, sp, torch.zeros(2, 3)),
+        )
+    print("saturation: an all-False mask is identical to never calling set_saturated")
+
+
 if __name__ == "__main__":
     torch.manual_seed(0)
     test_hover()
     test_tilt_sign()
     test_closed_loop()
     test_batched_and_reset()
+    test_saturation_freezes_integrators()
+    test_saturation_never_set_is_unchanged()
     print("ALL PID TESTS PASSED")

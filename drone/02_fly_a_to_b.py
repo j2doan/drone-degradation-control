@@ -1,37 +1,47 @@
-"""Step 2: fly the drone in a straight line from A to B, then hover.
+"""Step 2: fly one seed's curved path from A to B and print progress.
 
-The Lee controller flies it (no RL).
+The seed also picks the fault, if any. Saves nothing.
 
-Run (from your IsaacLab folder):
-    # opens the viewer
-    uv run --extra isaacsim python "<this folder>/02_fly_a_to_b.py"
-    # no window
-    uv run --extra isaacsim python "<this folder>/02_fly_a_to_b.py" --headless
-    ... --start 0 0 1 --goal 3 2 1.5 --speed 0.5
+Run (from the drone folder):
+    # seed 0 = healthy flight, opens the viewer
+    ./run.sh 02_fly_a_to_b.py --seed 0
+    # seed 3's path and fault, no window
+    ./run.sh 02_fly_a_to_b.py --seed 3 --headless
+Use 03_collect_data.py to save data.
 """
 
 import common
 import numpy as np
 
-args = common.parse_args(__doc__)
+parser = common.build_parser(__doc__)
+parser.add_argument(
+    "--seed",
+    type=int,
+    default=0,
+    help="Which seed's path (and fault, for seeds >= 1) to fly.",
+)
+args = common.parse_args(__doc__, parser)
 
 
 def main():
+    from drones import DRONES
     from isaaclab.app import launch_simulation
-    from isaaclab.physics import PhysicsCfg
 
-    with launch_simulation(cfg=PhysicsCfg(), launcher_args=args) as physics_cfg:
+    with launch_simulation(
+        cfg=common.launch_cfg(args), launcher_args=args
+    ) as physics_cfg:
         world = common.make_world(args, physics_cfg)
-        goal = np.asarray(args.goal)
+        flight = common.prepare_flight(args, world, args.seed, DRONES["d0"])
+        goal = np.asarray(flight.path.goal)
         print(
-            f"[INFO] Flying A={args.start} -> B={args.goal} at {args.speed} m/s, "
-            f"then hovering {args.hold}s"
+            f"[INFO] seed {args.seed}: path {flight.path.length:.1f} m "
+            f"from {np.round(flight.path.start, 2)} "
+            f"to {np.round(goal, 2)} at {args.speed} m/s; fault={flight.fault}; "
+            f"physically survivable={flight.feasibility['feasible']}"
         )
 
-        print(f"[INFO] controller={args.controller}  fault={world.fault}")
-
         last = None
-        for row in common.fly_a_to_b(args, world):
+        for row in common.fly(args, world, flight):
             if row["fault_active"] and (last is None or not last["fault_active"]):
                 print(
                     f"[FAULT] t={row['t']:.2f}s  motor {row['fault_motor']} lost "
