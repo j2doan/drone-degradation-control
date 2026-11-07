@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/google-deepmind/mujoco_menagerie.git",
+  "revision": "98a70c569c4c1b6da467a20012f766ee1f8dc521",
+  "model": "skydio_x2",
+  "scene": "skydio_x2/scene.xml",
+  "license": "Apache-2.0 (see skydio_x2/LICENSE in the asset checkout)"
+}

@@ -1,0 +1,212 @@
+{
+  "config": {
+    "condition": "motor",
+    "motion": "steady",
+    "seed": 3,
+    "dt_s": 0.01,
+    "duration_s": 20.0,
+    "motor": 3,
+    "motor_loss": 0.2,
+    "motor_onset_s": 6.0,
+    "motor_duration_s": null,
+    "force_z_n": -0.8,
+    "force_onset_s": 10.0,
+    "force_duration_s": 2.0,
+    "target_z_m": 1.0,
+    "probe_onset_s": 4.0,
+    "probe_amplitude_m": 0.06,
+    "probe_frequency_hz": 0.7,
+    "velocity_noise_std_m_s": 0.01,
+    "initial_z_jitter_m": 0.01,
+    "max_thrust_n": 6.0,
+    "history_s": 3.0
+  },
+  "backend": "mujoco_x2",
+  "simulator_version": "3.17.0",
+  "versions": {
+    "mujoco": "3.17.0",
+    "numpy": "2.5.4",
+    "torch": "2.15.0"
+  },
+  "physics": "Full six-degree-of-freedom free rigid body, MuJoCo site motors, Skydio X2 Menagerie",
+  "mass_kg": 1.325,
+  "inertia_body_kg_m2": [
+    [
+      0.03665169811320772,
+      0.0,
+      -0.0021000000000000133
+    ],
+    [
+      0.0,
+      0.02541169811320768,
+      0.0
+    ],
+    [
+      -0.0021000000000000133,
+      0.0,
+      0.06052800000000029
+    ]
+  ],
+  "allocation_matrix": [
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    [
+      -0.18,
+      0.18,
+      0.18,
+      -0.18
+    ],
+    [
+      0.14,
+      0.14,
+      -0.14,
+      -0.14
+    ],
+    [
+      -0.0201,
+      0.0201,
+      -0.0201,
+      0.0201
+    ]
+  ],
+  "controller": "Cascaded PID with motor-cap anti-windup; shadow estimates do not control it",
+  "controller_path": "drone/controllers/pid.py",
+  "controller_sha256": "df6daf6995e350b95e3292a36fa28d0435e6b77895cf55881c1d009b02e7a98b",
+  "controller_gains": {
+    "kp_pos": [
+      3.0,
+      3.0,
+      1.75
+    ],
+    "ki_pos": [
+      0.05,
+      0.05,
+      1.0
+    ],
+    "kd_pos": [
+      3.0,
+      3.0,
+      1.75
+    ],
+    "i_pos_limit": [
+      0.3,
+      0.3,
+      1.5
+    ],
+    "i_vel_zone": 0.2,
+    "i_pos_zone": 1.0,
+    "kp_att": [
+      1.725,
+      1.725,
+      0.325
+    ],
+    "ki_att": [
+      1.0,
+      1.0,
+      0.2
+    ],
+    "kd_att": [
+      0.45,
+      0.45,
+      0.0825
+    ],
+    "i_att_limit": [
+      0.5,
+      0.5,
+      1.0
+    ],
+    "max_tilt": 1.047
+  },
+  "actuator": {
+    "model": "First-order Euler thrust lag, calibrated known scalar constant",
+    "tau_s": 0.125,
+    "command_cap_n": 6.0,
+    "native_min_n": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "native_max_n": [
+      13.0,
+      13.0,
+      13.0,
+      13.0
+    ],
+    "initial_nominal_thrust_n": [
+      3.2495624999999997,
+      3.249562499999997,
+      3.2495625,
+      3.249562499999997
+    ],
+    "order": "requested -> bounded -> nominal lag/native clip -> effectiveness -> site force and reaction torque"
+  },
+  "initialization": "Known healthy hover motor thrust, level attitude",
+  "initial_z_jitter_m": -0.0074884607396616554,
+  "failure_thresholds": {
+    "min_height_m": 0.05,
+    "max_tilt_deg": 60.0
+  },
+  "nominal_replay_audit": {
+    "maximum_absolute_error_n": 0.0,
+    "verified_intervals": 2000,
+    "absolute_tolerance_n": 1e-10
+  },
+  "wrench_audit": {
+    "maximum_generalized_force_error": 3.552713678800501e-15,
+    "verified_intervals": 2000
+  },
+  "model": {
+    "scene_path": "assets/mujoco_menagerie/skydio_x2/scene.xml",
+    "file_sha256": {
+      "CHANGELOG.md": "3ed28367c5094ed3719c3ea91b7144cb6a2e1c869e6bfd0ef23a8b5dd56eea65",
+      "LICENSE": "d42cae9a0f292b7a713597ba26e1e1e23d50df906c488f0d36fd3538af200bc1",
+      "README.md": "7b1b354ffdd2e9f243b211cc6ea9b5dab17614a13fc567378ded2b7676c13394",
+      "assets/X2_lowpoly.obj": "4d6df3d7b26676a6ade8cbc320599961321ac3e3c52474d7c98dd7adc8152411",
+      "assets/X2_lowpoly_texture_SpinningProps_1024.png": "24153733dd01f9ddd37a3c79fad5e24ac876228812e3a8e95f60ccd8cedb66e1",
+      "scene.xml": "0a81cc0a15091cc3a91f7abf5a2694aeef555fbf94ed79876896eef38b1dad88",
+      "x2.png": "512021031d29096eb793c225331bfbd132488aa5b7b76f652d34587f78aaed9e",
+      "x2.xml": "b1cc5d68eb8ff154ab93a9958b58f69210865e1793eb96b30a32f46c68cc7e71"
+    },
+    "menagerie_revision": "98a70c569c4c1b6da467a20012f766ee1f8dc521"
+  },
+  "model_fluid_settings": {
+    "density": 1.225,
+    "viscosity": 1.8e-05
+  },
+  "estimator_inputs": [
+    "time",
+    "noisy COM vertical velocity",
+    "previous command-only nominal replay projected by previous attitude"
+  ],
+  "calibration_assumptions": [
+    "Known candidate motor and mass",
+    "Known nominal lag and healthy initial motor state",
+    "Only candidate motor degrades; world-vertical added force and no external moments",
+    "Existing X2 aerodynamics/contact remain physics-model effects, not supplied to estimator"
+  ],
+  "truth_fields_are_diagnostics_only": true,
+  "estimators_in_shadow": true,
+  "velocity_convention": "PID uses body-origin world linear velocity; estimator vz_m_s/measured_vz_m_s use COM velocity v_origin+R(omega_body x body_ipos). z_m tracks body-origin reference.",
+  "protocol_difference": "Hover/probe at 1m, 6N cap, post-output loss; do not pool with legacy straight-route target-loss sweeps",
+  "status": "complete",
+  "failed": false,
+  "termination_reason": "completed",
+  "row_count": 2001
+}
