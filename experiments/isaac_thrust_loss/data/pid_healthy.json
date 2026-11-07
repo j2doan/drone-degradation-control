@@ -1,0 +1,35 @@
+{
+  "name": "pid_healthy",
+  "controller": "pid",
+  "start": [
+    0.0,
+    0.0,
+    1.0
+  ],
+  "goal": [
+    3.0,
+    0.0,
+    1.0
+  ],
+  "speed": 0.5,
+  "hold": 3.0,
+  "fault_mode": "none",
+  "fault_seed": 0,
+  "fault": null,
+  "metrics": {
+    "final_dist_to_B": 0.02259985911568557,
+    "path_length": 4.0834379880352145,
+    "max_deviation": 0.5455271473657873,
+    "mean_deviation": 0.1500543221212145,
+    "max_sideways_drift": 0.0301951151341199,
+    "time_to_arrive": 5.8,
+    "smoothness": 0.004467800475068566,
+    "fault_motor": -1,
+    "fault_loss": 0.0,
+    "fault_onset_t": NaN,
+    "max_alt_loss_after_fault": NaN,
+    "recovery_time": NaN,
+    "crashed": false,
+    "crash_t": NaN
+  }
+}
