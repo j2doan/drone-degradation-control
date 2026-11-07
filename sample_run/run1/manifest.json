@@ -1,0 +1,121 @@
+{
+  "created": "2026-11-04T23:54:57-08:00",
+  "command": "--name run1 --runs 10 --headless",
+  "sim": "isaac",
+  "isaaclab_revision": "49139e160130162815dac27da335826d0d1e7fc0",
+  "python": "3.12.13",
+  "torch": "2.11.0+cu130",
+  "gpu": "NVIDIA GeForce RTX 5070 Laptop GPU",
+  "controller": "pid",
+  "pid_gains": {
+    "kp_pos": [
+      3.0,
+      3.0,
+      1.75
+    ],
+    "ki_pos": [
+      0.05,
+      0.05,
+      1.0
+    ],
+    "kd_pos": [
+      3.0,
+      3.0,
+      1.75
+    ],
+    "i_pos_limit": [
+      0.3,
+      0.3,
+      1.5
+    ],
+    "i_vel_zone": 0.2,
+    "i_pos_zone": 1.0,
+    "kp_att": [
+      1.725,
+      1.725,
+      0.325
+    ],
+    "ki_att": [
+      1.0,
+      1.0,
+      0.2
+    ],
+    "kd_att": [
+      0.45,
+      0.45,
+      0.0825
+    ],
+    "i_att_limit": [
+      0.5,
+      0.5,
+      1.0
+    ],
+    "max_tilt": 1.047
+  },
+  "max_motor_thrust_n": 6.0,
+  "sim_dt_s": 0.01,
+  "settings": {
+    "sim": "isaac",
+    "speed": 0.5,
+    "hold": 3.0,
+    "max_steps": -1,
+    "controller": "pid",
+    "fault": "random",
+    "fault_motor": 0,
+    "fault_loss": 0.25,
+    "fault_onset": 4.0,
+    "max_thrust": 6.0,
+    "camera": false,
+    "camera_res": 64,
+    "headless": true,
+    "physics": "isaacsim_physx",
+    "livestream": 0,
+    "xr": false,
+    "device": "cuda:0",
+    "visualizer": [],
+    "verbose": false,
+    "info": false,
+    "experience": "",
+    "deterministic": false,
+    "kit_args": "",
+    "anim_recording_enabled": false,
+    "anim_recording_start_time": 0,
+    "anim_recording_stop_time": 10,
+    "name": "run1",
+    "runs": 10,
+    "seeds": null,
+    "overwrite": false,
+    "hide_ui": true,
+    "physics_gpu": 0
+  },
+  "code_sha256": {
+    "01_inspect_env.py": "bef7e0cc992b",
+    "02_fly_a_to_b.py": "2d75b7305458",
+    "03_collect_data.py": "e8003ffee313",
+    "analysis/__init__.py": "00cabb326c32",
+    "analysis/metrics.py": "dcd7f289e07b",
+    "analysis/plots.py": "17a667f074eb",
+    "analysis/route.py": "ee2bdbace623",
+    "common.py": "10c38a02e558",
+    "controllers/__init__.py": "29299d59016a",
+    "controllers/pid.py": "57f4fc02c559",
+    "controllers/test_pid.py": "37ea9dd9ef49",
+    "drones.py": "2de1a2a6ee81",
+    "faults/__init__.py": "b6dcb98f920f",
+    "faults/test_faults.py": "cf52fcc26be1",
+    "faults/thrust_loss.py": "f26e82d352b8",
+    "motors/__init__.py": "53eda691be99",
+    "motors/test_thruster.py": "35bb7d95277d",
+    "motors/thruster.py": "355d85ad6936",
+    "paths/__init__.py": "a12b04073cfc",
+    "paths/curve.py": "ca948c5a6ef1",
+    "paths/test_curve.py": "2d561cf73b3c",
+    "sensors/__init__.py": "0acf21073224",
+    "sensors/noise.py": "5d80c8f454b9",
+    "sensors/test_noise.py": "31ee00a13434",
+    "sim_isaac.py": "b72b5e4c6bec",
+    "sim_mujoco.py": "8a1f474a0e8e",
+    "test_drones.py": "a452072c8b5d",
+    "test_sim_mujoco.py": "12ef38964a7a"
+  }
+}

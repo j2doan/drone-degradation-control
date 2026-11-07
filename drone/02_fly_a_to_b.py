@@ -7,6 +7,8 @@ Run (from the drone folder):
     ./run.sh 02_fly_a_to_b.py --seed 0
     # seed 3's path and fault, no window
     ./run.sh 02_fly_a_to_b.py --seed 3 --headless
+    # the same flight in MuJoCo
+    ./run.sh 02_fly_a_to_b.py --seed 3 --sim mujoco
 Use 03_collect_data.py to save data.
 """
 
@@ -25,11 +27,8 @@ args = common.parse_args(__doc__, parser)
 
 def main():
     from drones import DRONES
-    from isaaclab.app import launch_simulation
 
-    with launch_simulation(
-        cfg=common.launch_cfg(args), launcher_args=args
-    ) as physics_cfg:
+    with common.session(args) as physics_cfg:
         world = common.make_world(args, physics_cfg)
         flight = common.prepare_flight(args, world, args.seed, DRONES["d0"])
         goal = np.asarray(flight.path.goal)

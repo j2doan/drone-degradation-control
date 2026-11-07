@@ -2,8 +2,10 @@
 
 Nothing flies.
 
-Run (from your IsaacLab folder):
-    uv run --extra isaacsim python "<this folder>/01_inspect_env.py" --headless
+Run (from the drone folder):
+    ./run.sh 01_inspect_env.py --headless
+    # the MuJoCo copy of the same drone
+    ./run.sh 01_inspect_env.py --headless --sim mujoco
 """
 
 import common
@@ -12,28 +14,46 @@ args = common.parse_args(__doc__)
 
 
 def main():
-    from isaaclab.app import launch_simulation
-    from isaaclab.physics import PhysicsCfg
-
-    with launch_simulation(cfg=PhysicsCfg(), launcher_args=args) as physics_cfg:
+    with common.session(args) as physics_cfg:
         world = common.make_world(args, physics_cfg)
-        robot, d = world.robot, world.robot.data
 
         print("\n===== DRONE INSPECTION =====")
-        print("thrusters (action order):", d.thruster_names)
-        print("number of thrusters     :", robot.num_thrusters)
-        print("total mass [kg]         :", world.lee.mass.flatten().tolist())
-        print("inertia [kg m^2]        :", world.lee.robot_inertia[0].tolist())
+        print("simulator               :", args.sim)
+        print("total mass [kg]         :", world.mass)
+        print("inertia [kg m^2]        :", world.inertia)
         print("flying controller       :", args.controller)
         print("allocation matrix (rows Fx,Fy,Fz,Tx,Ty,Tz; cols = thrusters):")
-        print(robot.allocation_matrix)
-        thr = robot.cfg.actuators["thrusters"]
-        print("thrust range [N]        :", thr.thrust_range)
-        print("thrust const range      :", thr.thrust_const_range)
-        print("spin-up/down time const :", thr.tau_inc_range, thr.tau_dec_range)
-        print("\nstate available at spawn (pos A):")
-        for name in ("root_pos_w", "root_quat_w", "root_lin_vel_w", "root_ang_vel_b"):
-            print(f"  {name:16s}", common._t(getattr(d, name))[0].tolist())
+        for row in world.allocation:
+            print("   ", [float(v) for v in row])
+        if args.sim == "isaac":
+            robot, d = world.robot, world.robot.data
+            print("thrusters (action order):", d.thruster_names)
+            thr = robot.cfg.actuators["thrusters"]
+            print("thrust range [N]        :", thr.thrust_range)
+            print("thrust const range      :", thr.thrust_const_range)
+            print("spin-up/down time const :", thr.tau_inc_range, thr.tau_dec_range)
+            print("\nstate available at spawn (pos A):")
+            for name in (
+                "root_pos_w",
+                "root_quat_w",
+                "root_lin_vel_w",
+                "root_ang_vel_b",
+            ):
+                print(
+                    f"  {name:16s}",
+                    common.backend(args)._t(getattr(d, name))[0].tolist(),
+                )
+        else:
+            from motors import thruster
+
+            print("thrust range [N]        :", thruster.THRUST_RANGE)
+            print("thrust const range      :", thruster.THRUST_CONST_RANGE)
+            print(
+                "spin-up/down time const :",
+                thruster.TAU_INC_RANGE,
+                thruster.TAU_DEC_RANGE,
+            )
+            print("timestep [s]            :", world.model.opt.timestep)
         print("============================\n")
 
 
